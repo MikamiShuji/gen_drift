@@ -1,4 +1,4 @@
-  """Time-series Generative Adversarial Networks (TimeGAN) Codebase.
+"""Time-series Generative Adversarial Networks (TimeGAN) Codebase.
 
 Reference: Jinsung Yoon, Daniel Jarrett, Mihaela van der Schaar, 
 "Time-series Generative Adversarial Networks," 
@@ -24,13 +24,13 @@ from utils import extract_time, rnn_cell, random_generator, batch_generator
 
 def timegan (ori_data, parameters):
   """TimeGAN function.
-  
+
   Use original data as training set to generater synthetic data (time-series)
-  
+
   Args:
     - ori_data: original time-series data
     - parameters: TimeGAN network parameters
-    
+
   Returns:
     - generated_data: generated time-series data
   """
@@ -39,122 +39,122 @@ def timegan (ori_data, parameters):
 
   # Basic Parameters
   no, seq_len, dim = np.asarray(ori_data).shape
-    
+
   # Maximum sequence length and each sequence length
   ori_time, max_seq_len = extract_time(ori_data)
-  
+
   def MinMaxScaler(data):
     """Min-Max Normalizer.
-    
+
     Args:
       - data: raw data
-      
+
     Returns:
       - norm_data: normalized data
       - min_val: minimum values (for renormalization)
       - max_val: maximum values (for renormalization)
-    """    
+    """
     min_val = np.min(np.min(data, axis = 0), axis = 0)
     data = data - min_val
-      
+
     max_val = np.max(np.max(data, axis = 0), axis = 0)
     norm_data = data / (max_val + 1e-7)
-      
+
     return norm_data, min_val, max_val
-  
+
   # Normalization
   ori_data, min_val, max_val = MinMaxScaler(ori_data)
-              
-  ## Build a RNN networks          
-  
+
+  ## Build a RNN networks
+
   # Network Parameters
-  hidden_dim   = parameters['hidden_dim'] 
+  hidden_dim   = parameters['hidden_dim']
   num_layers   = parameters['num_layer']
   iterations   = parameters['iterations']
   batch_size   = parameters['batch_size']
-  module_name  = parameters['module'] 
+  module_name  = parameters['module']
   z_dim        = dim
   gamma        = 1
-    
+
   # Input place holders
   X = tf.compat.v1.placeholder(tf.float32, [None, max_seq_len, dim], name = "myinput_x")
   Z = tf.compat.v1.placeholder(tf.float32, [None, max_seq_len, z_dim], name = "myinput_z")
   T = tf.compat.v1.placeholder(tf.int32, [None], name = "myinput_t")
-  
+
   def embedder (X, T):
     """Embedding network between original feature space to latent space.
-    
+
     Args:
       - X: input time-series features
       - T: input time information
-      
+
     Returns:
       - H: embeddings
     """
     with tf.compat.v1.variable_scope("embedder", reuse = tf.compat.v1.AUTO_REUSE):
       e_cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
       e_outputs, e_last_states = tf.compat.v1.nn.dynamic_rnn(e_cell, X, dtype=tf.float32, sequence_length = T)
-      H = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)     
+      H = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)
     return H
-      
-  def recovery (H, T):   
+
+  def recovery (H, T):
     """Recovery network from latent space to original space.
-    
+
     Args:
       - H: latent representation
       - T: input time information
-      
+
     Returns:
       - X_tilde: recovered data
-    """     
-    with tf.compat.v1.variable_scope("recovery", reuse = tf.compat.v1.AUTO_REUSE):       
+    """
+    with tf.compat.v1.variable_scope("recovery", reuse = tf.compat.v1.AUTO_REUSE):
       r_cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
       r_outputs, r_last_states = tf.compat.v1.nn.dynamic_rnn(r_cell, H, dtype=tf.float32, sequence_length = T)
-      X_tilde = tf.contrib.layers.fully_connected(r_outputs, dim, activation_fn=tf.nn.sigmoid) 
+      X_tilde = tf.contrib.layers.fully_connected(r_outputs, dim, activation_fn=tf.nn.sigmoid)
     return X_tilde
-    
-  def generator (Z, T):  
+
+  def generator (Z, T):
     """Generator function: Generate time-series data in latent space.
-    
+
     Args:
       - Z: random variables
       - T: input time information
-      
+
     Returns:
       - E: generated embedding
-    """        
+    """
     with tf.compat.v1.variable_scope("generator", reuse = tf.compat.v1.AUTO_REUSE):
       e_cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
       e_outputs, e_last_states = tf.compat.v1.nn.dynamic_rnn(e_cell, Z, dtype=tf.float32, sequence_length = T)
-      E = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)     
+      E = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)
     return E
-      
-  def supervisor (H, T): 
+
+  def supervisor (H, T):
     """Generate next sequence using the previous sequence.
-    
+
     Args:
       - H: latent representation
       - T: input time information
-      
+
     Returns:
       - S: generated sequence based on the latent representations generated by the generator
-    """          
+    """
     with tf.compat.v1.variable_scope("supervisor", reuse = tf.compat.v1.AUTO_REUSE):
       e_cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([rnn_cell(module_name, hidden_dim) for _ in range(num_layers-1)])
       e_outputs, e_last_states = tf.compat.v1.nn.dynamic_rnn(e_cell, H, dtype=tf.float32, sequence_length = T)
-      S = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)     
+      S = tf.contrib.layers.fully_connected(e_outputs, hidden_dim, activation_fn=tf.nn.sigmoid)
     return S
-          
+
   def discriminator (H, T):
     """Discriminate the original and synthetic time-series data.
-    
+
     Args:
       - H: latent representation
       - T: input time information
-      
+
     Returns:
       - Y_hat: classification results between original and synthetic time-series
-    """        
+    """
     with tf.compat.v1.variable_scope("discriminator", reuse = tf.compat.v1.AUTO_REUSE):
       d_cell = tf.compat.v1.nn.rnn_cell.MultiRNNCell([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
       d_outputs, d_last_states = tf.compat.v1.nn.dynamic_rnn(d_cell, H, dtype=tf.float32, sequence_length = T)

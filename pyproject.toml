@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "gen-drift"
+version = "0.1.0"
+description = "Generative models for augmentation-based Concept Drift Detection"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "gen_drift"}]
+
+[tool.poetry.dependencies]
+python = "3.10.*"
+tensorflow = {version = "2.14"}
+pandas = ">2.1"
+tqdm = "^4.66.1"
+seaborn = "^0.13.2"
+scikit-learn = "^1.4.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
