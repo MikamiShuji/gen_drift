@@ -1,0 +1,10 @@
+numpy
+tqdm
+argparse
+pandas
+scikit-learn
+matplotlib
+jupyterlab
+seaborn
+pandas_datareader
+tables
